@@ -22,7 +22,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install playwright requests
+          pip install playwright requests python-dotenv
 
       - name: Install Playwright Chromium
         run: |
