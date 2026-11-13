@@ -2,8 +2,8 @@ name: Termin Monitor
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # 每 10 分钟运行一次（最短支持 5 分钟）
-  workflow_dispatch:          # 允许在 Actions 页面手动触发，方便测试
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   check:
@@ -18,13 +18,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip' # 👈 新增：自动缓存 pip 下载的包
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install playwright requests python-dotenv
 
+      - name: Cache Playwright browsers # 👈 新增：缓存 Playwright 浏览器
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-v1
+
       - name: Install Playwright Chromium
+        # 如果缓存命中了，就跳过下载（但 --with-deps 的系统依赖每次都要装，较快）
         run: |
           python -m playwright install chromium --with-deps
 
