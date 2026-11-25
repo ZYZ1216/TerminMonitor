@@ -18,7 +18,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip' # 👈 新增：自动缓存 pip 下载的包
 
       - name: Install Python dependencies
         run: |
