@@ -1,5 +1,6 @@
 import os
 import time
+import random
 from dotenv import load_dotenv
 import requests
 from playwright.sync_api import sync_playwright
@@ -12,6 +13,11 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # 🚨 正式部署：关闭测试模式，只有真正检测到 Nächster Termin 时才发送推送
 TEST_TG_NOTIFICATION = False
+
+# 🔄 循环监控配置
+MIN_INTERVAL = 180   # 最小间隔（秒）
+MAX_INTERVAL = 300   # 最大间隔（秒）
+MAX_RUNS = None      # 最大运行次数，None 表示无限循环
 
 
 def send_telegram(message):
@@ -121,8 +127,8 @@ def check_termin_once(page):
         return False, "目前无号 (未检测到 Nächster Termin)"
 
 
-def run():
-    """云端/单次运行入口"""
+def _run_browser_check():
+    """内部：启动浏览器并执行一次检查，返回是否检测到预约"""
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -137,10 +143,64 @@ def run():
         try:
             has_termin, msg = check_termin_once(page)
             print(f"📌 运行结果: {msg}")
+            return has_termin
         except Exception as e:
             print(f"⚠️ 本轮检查出现异常: {e}")
+            return False
         finally:
             browser.close()
+
+
+def run_once():
+    """单次检查入口（供循环调用或外部调用）"""
+    return _run_browser_check()
+
+
+def run():
+    """单次运行入口（保留用于兼容或一次性检测）"""
+    _run_browser_check()
+
+
+def run_loop():
+    """循环运行入口：每隔随机 180~300 秒持续检测"""
+    run_count = 0
+    print("🔄 TerminMonitor 循环监控已启动")
+    print(f"   检测间隔: {MIN_INTERVAL} ~ {MAX_INTERVAL} 秒（随机）")
+    if MAX_RUNS:
+        print(f"   最大运行次数: {MAX_RUNS}")
+    print("   按 Ctrl+C 停止\n")
+
+    try:
+        while True:
+            if MAX_RUNS is not None and run_count >= MAX_RUNS:
+                print(f"✅ 已达到最大运行次数 {MAX_RUNS}，退出循环。")
+                break
+
+            run_count += 1
+            print(f"\n{'='*50}")
+            print(f"🔄 第 {run_count} 轮检测")
+            print(f"{'='*50}")
+
+            found = run_once()
+
+            if found:
+                print("✅ 检测到预约！已发送 Telegram 通知。")
+
+            # 计算随机等待时间
+            wait_seconds = random.randint(MIN_INTERVAL, MAX_INTERVAL)
+            print(f"\n⏳ 等待 {wait_seconds} 秒后进行下一次检测...")
+
+            # 分段睡眠（每段 5 秒），方便 Ctrl+C 及时响应
+            slept = 0
+            while slept < wait_seconds:
+                chunk = min(5, wait_seconds - slept)
+                time.sleep(chunk)
+                slept += chunk
+
+    except KeyboardInterrupt:
+        print("\n\n🛑 收到中断信号，正在安全退出监控...")
+    finally:
+        print("✅ TerminMonitor 已停止。")
 
 
 if __name__ == "__main__":

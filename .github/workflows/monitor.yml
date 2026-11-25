@@ -2,13 +2,13 @@ name: Termin Monitor
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/3 * * * *'   # 每 3 分钟触发一次单次检测
   workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 15  # 每次单次检测通常几分钟内完成，15 分钟足够
 
     steps:
       - name: Checkout repository
