@@ -2,13 +2,13 @@ name: Termin Monitor
 
 on:
   schedule:
-    - cron: '*/3 * * * *'   # 每 3 分钟触发一次单次检测
+    - cron: '*/5 * * * *'   # GitHub 官方允许的最短间隔：每 5 分钟一次
   workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 每次单次检测通常几分钟内完成，15 分钟足够
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install playwright requests python-dotenv
 
-      - name: Cache Playwright browsers # 👈 新增：缓存 Playwright 浏览器
+      - name: Cache Playwright browsers
         id: cache-playwright
         uses: actions/cache@v4
         with:
@@ -32,13 +32,14 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-v1
 
       - name: Install Playwright Chromium
-        # 如果缓存命中了，就跳过下载（但 --with-deps 的系统依赖每次都要装，较快）
-        run: |
-          python -m playwright install chromium --with-deps
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: python -m playwright install chromium
+
+      - name: Install Playwright OS dependencies
+        run: python -m playwright install-deps chromium
 
       - name: Run monitor
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python test_background.py
-        
